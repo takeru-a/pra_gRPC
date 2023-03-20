@@ -19,6 +19,51 @@ var (
 	client  hellopb.GreetingServiceClient
 )
 
+func main(){
+	fmt.Println("start gRPC client.")
+	scanner = bufio.NewScanner(os.Stdin)
+
+	address := "localhost:8080"
+	conn, err := grpc.Dial(
+		address,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithBlock(),
+	)
+	if err != nil{
+		log.Fatal("Connection failed.")
+		return
+	}
+	defer conn.Close()
+
+	// gRPCクライアント生成
+	client = hellopb.NewGreetingServiceClient(conn)
+
+	for {
+		fmt.Println("1: send Request")
+		fmt.Println("2: ServerStream")
+		fmt.Println("3: ClientStream")
+		fmt.Println("4: exit")
+		fmt.Print("please enter >")
+
+		scanner.Scan()
+		in := scanner.Text()
+
+		switch in {
+		case "1":
+			Hello()
+		case "2":
+			HelloServerStream()
+		case "3":
+			HelloClientStream()
+		case "4":
+			fmt.Println("bye.")
+			goto M
+		}
+	}
+	M:
+}
+
+
 func Hello() {
 	fmt.Println("Please enter your name.")
 	scanner.Scan()
@@ -68,43 +113,31 @@ func HelloServerStream(){
 
 }
 
-func main(){
-	fmt.Println("start gRPC client.")
-	scanner = bufio.NewScanner(os.Stdin)
-
-	address := "localhost:8080"
-	conn, err := grpc.Dial(
-		address,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithBlock(),
-	)
-	if err != nil{
-		log.Fatal("Connection failed.")
+func HelloClientStream() {
+	stream, err := client.HelloClientStream(context.Background())
+	if err != nil {
+		fmt.Println(err)
 		return
 	}
-	defer conn.Close()
 
-	// gRPCクライアント生成
-	client = hellopb.NewGreetingServiceClient(conn)
-
-	for {
-		fmt.Println("1: send Request")
-		fmt.Println("2: ServerStream")
-		fmt.Println("3: exit")
-		fmt.Print("please enter >")
-
+	sendCount := 3
+	fmt.Printf("Please enter %d names.\n", sendCount)
+	for i := 0; i < sendCount; i++ {
 		scanner.Scan()
-		in := scanner.Text()
+		name := scanner.Text()
 
-		switch in {
-		case "1":
-			Hello()
-		case "2":
-			HelloServerStream()
-		case "3":
-			fmt.Println("bye.")
-			goto M
+		if err := stream.Send(&hellopb.HelloRequest{
+			Name: name,
+		}); err != nil {
+			fmt.Println(err)
+			return
 		}
 	}
-	M:
+
+	res, err := stream.CloseAndRecv()
+	if err != nil {
+		fmt.Println(err)
+	} else {
+		fmt.Println(res.GetMessage())
+	}
 }
