@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"time"
+
 	hellopb "github.com/takeru-a/pra_gRPC/pkg/grpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -57,6 +58,24 @@ func(s *myServer) HelloClientStream(stream hellopb.GreetingService_HelloClientSt
 			return err
 		}
 		nameList = append(nameList, req.GetName())
+	}
+}
+
+func (s *myServer) HelloBiStreams(stream hellopb.GreetingService_HelloBiStreamsServer) error{
+	for{
+		req, err := stream.Recv()
+		if errors.Is(err, io.EOF){
+			return nil
+		}
+		if err != nil{
+			return err
+		}
+		message := fmt.Sprintf("Hello, %v!", req.GetName())
+		if err := stream.Send(&hellopb.HelloResponse{
+			Message: message,
+		}); err != nil{
+			return err
+		}
 	}
 }
 
